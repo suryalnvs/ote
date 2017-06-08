@@ -69,6 +69,7 @@ import (
         "github.com/hyperledger/fabric/msp/mgmt"
         genesisconfigProvisional "github.com/hyperledger/fabric/common/configtx/tool/provisional"
         genesisconfig "github.com/hyperledger/fabric/common/configtx/tool/localconfig" // config for genesis.yaml
+//        genesisconfig "github.com/hyperledger/fabric/sampleconfig"
         "github.com/hyperledger/fabric/orderer/localconfig" // config, for the orderer.yaml
         cb "github.com/hyperledger/fabric/protos/common"
         ab "github.com/hyperledger/fabric/protos/orderer"
@@ -296,6 +297,16 @@ func (r *ordererdriveClient) readUntilClose(ordererIndex int, channelIndex int, 
                         logger(fmt.Sprintf("Got DeliverResponse_Status: %v", t))
                 case *ab.DeliverResponse_Block:
                         //fmt.Println("Received block: ", int64(len(t.Block.Data.Data)))
+	                /*f, err := os.Create(fmt.Sprintf("consumer_orderer%d.txt", ordererIndex))
+		        if err != nil {
+			        panic(err)
+			}
+
+			f, err = os.OpenFile(fmt.Sprintf("consumer_orderer%d.txt", ordererIndex), os.O_APPEND|os.O_WRONLY, 0600)
+                        defer f.Close()
+                        if _, err = f.WriteString(fmt.Sprintf("%s\n", t.Block)); err != nil {
+				panic(err)
+			}*/
                         *txRecvCntrP += int64(len(t.Block.Data.Data))
                         (*blockRecvCntrP)++
                         if ((*blockRecvCntrP) <= 2) || (int64(len(t.Block.Data.Data)) < batchSize) {
@@ -391,7 +402,7 @@ func startConsumer(serverAddr string, chanID string, ordererIndex int, channelIn
                 panic(fmt.Sprintf("Error on client %s invoking Deliver() on grpc connection to %s, err: %v", myName, serverAddr, err))
         }
         // Load up MSP information
-        mgmt.LoadLocalMsp(mspDir, &factory.DefaultOpts, mspID)
+        mgmt.LoadLocalMsp(mspDir, factory.GetDefaultOpts(), mspID)
 
         // create signer
         signer := localmsp.NewSigner()
@@ -425,7 +436,7 @@ func startConsumerMaster(serverAddr string, chanIdsP *[]string, ordererIndex int
         // create an orderer driver client for every channel on this orderer
         //[][]*ordererdriveClient  //  numChannels
                 // Load up MSP information
-                mgmt.LoadLocalMsp(mspDir, &factory.DefaultOpts, mspID)
+                mgmt.LoadLocalMsp(mspDir, factory.GetDefaultOpts(), mspID)
 
                 // create signer
                 signer := localmsp.NewSigner()
@@ -620,7 +631,7 @@ func startProducer(serverAddr string, chanID string, ordererIndex int, channelIn
                 panic(fmt.Sprintf("Error creating Producer for ord[%d] ch[%d], err: %v", ordererIndex, channelIndex, err))
         }
         // Load up MSP information
-        mgmt.LoadLocalMsp(mspDir, &factory.DefaultOpts, mspID)
+        mgmt.LoadLocalMsp(mspDir, factory.GetDefaultOpts(), mspID)
 
         // create signer
         signer := localmsp.NewSigner()
@@ -653,11 +664,23 @@ func startProducer(serverAddr string, chanID string, ordererIndex int, channelIn
         // Define the number of seconds for allowin continual failures, to wait around for recovery.
         delayLimit := 120
         errDelay := 0
+        /*f, err := os.Create(fmt.Sprintf("producer_orderer%d.txt", ordererIndex))
+        if err != nil {
+                panic(err)
+        }
 
+        f, err = os.OpenFile(fmt.Sprintf("producer_orderer%d.txt", ordererIndex), os.O_APPEND|os.O_WRONLY, 0600)
+        defer f.Close()
+        */
         prevMsgAck := false
         for i := int64(0); i < txReq ; i++ {
-                b.broadcast([]byte(fmt.Sprintf("Testing %s TX=%d %v %s", myName, i, time.Now(), extraTxData)), signer)
+	        b.broadcast([]byte(fmt.Sprintf("Testing %s TX=%d %v %s", myName, i, time.Now(), extraTxData)), signer)
+
                 err = b.getAck()
+                /*if _, err1 := f.WriteString(fmt.Sprintf("%s\n", err)); err1 != nil {
+                        panic(err1)
+                }*/
+
                 if err == nil {
                         (*txSentCntrP)++
                         if !prevMsgAck { logger(fmt.Sprintf("%s successfully broadcast TX %d (ACK=%d NACK=%d), %v", myName, i, *txSentCntrP, *txSentFailureCntrP, time.Now())) }
@@ -739,7 +762,7 @@ func startProducerMaster(serverAddr string, chanIdsP *[]string, ordererIndex int
                 panic(fmt.Sprintf("Error creating %s, err: %v", myName, err))
         }
         // Load up MSP information
-        mgmt.LoadLocalMsp(mspDir, &factory.DefaultOpts, mspID)
+        mgmt.LoadLocalMsp(mspDir, factory.GetDefaultOpts(), mspID)
 
         // create signer
         signer := localmsp.NewSigner()
@@ -1309,7 +1332,7 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
 
         logger("Finished creating all CONSUMERS clients")
         time.Sleep(10 * time.Second)
-        //defer cleanNetwork(&consumerConns)
+        defer cleanNetwork(&consumerConns)
 
         ////////////////////////////////////////////////////////////////////////
         // Now that the orderer service network is running, and the consumers
