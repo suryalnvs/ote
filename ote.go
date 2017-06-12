@@ -546,11 +546,11 @@ func cleanNetwork(consumerConnsP *([][]*grpc.ClientConn)) {
         _,_ = executeCmd("cd ../../../examples/fabric-docker-compose-svt && ./network_setup.sh down")
 }
 
-func launchNetwork(appendFlags string) {
+func launchNetwork(appendFlags string, chans int) {
         // Alternative way: hardcoded docker compose (not driver.sh tool)
         //  _ = executeCmd("docker-compose -f docker-compose-3orderers.yml up -d")
 
-        cmd := fmt.Sprintf("cd ../../../examples/fabric-docker-compose-svt && ./network_setup.sh -s ")
+        cmd := fmt.Sprintf("cd ../../../examples/fabric-docker-compose-svt && ./network_setup.sh -s -n %d", chans)
         logger(fmt.Sprintf("Launching network:  %s", cmd))
         if debugflagLaunch {
                 executeCmdAndDisplay(cmd) // show stdout logs; debugging help
@@ -1028,6 +1028,7 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
         if chans > 0      { numChannels = chans }      else { return passed, resultSummary + "number of channels must be > 0" }
         if orderers > 0   {
                 numOrdsInNtwk = orderers
+                //launchAppendFlags += fmt.Sprintf(" -n %d", chans)
                 launchAppendFlags += fmt.Sprintf(" -o %d", orderers)
         } else { return passed, resultSummary + "number of orderers in network must be > 0" }
 
@@ -1242,7 +1243,7 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
 
         ////////////////////////////////////////////////////////////////////////
 
-        launchNetwork(launchAppendFlags)
+        launchNetwork(launchAppendFlags, chans)
         time.Sleep(12 * time.Second)
 
         ordConf = config.Load()
@@ -1268,7 +1269,7 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
         // create all the channels using orderer0
         // CONFIGTX_ORDERER_ADDRESSES is the list of orderers. use the first one. Default is [127.0.0.1:7050]
         for c:=0; c < numChannels; c++ {
-                channelIDs[c] = fmt.Sprintf("mychannel")
+                channelIDs[c] = fmt.Sprintf("mychannel%d", c )
                 //cmd := fmt.Sprintf("cd $GOPATH/src/github.com/hyperledger/fabric && peer channel create -c %s", channelIDs[c])
                 //cmd := fmt.Sprintf("cd $GOPATH/src/github.com/hyperledger/fabric && CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/examples/fabric-docker-compose-svt/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt  && CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/examples/fabric-docker-compose-svt/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp && CORE_PEER_LOCALMSPID=Org1MSP && peer channel create -o 10.0.2.15:%d -c mychannel -f $GOPATH/src/github.com/hyperledger/fabric/examples/fabric-docker-compose-svt/channel-artifacts/mychannel.tx --tls true --cafile /opt/gopath/src/github.com/hyperledger/fabric/examples/fabric-docker-compose-svt/crypto-config/ordererOrganizations/example.com/orderers/orderer0.example.com/msp/cacerts/ca.example.com-cert.pem", ordStartPort)
                 //executeCmd(cmd)
@@ -1324,7 +1325,8 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
                                 //genConf.Application.Organizations[0].ID = fmt.Sprintf("PeerOrg1")
                                 //genConf.Application.Organizations[0].Name = genConf.Application.Organizations[0].ID
                                 //genConf.Application.Organizations[0].MSPDir = fmt.Sprintf("/opt/gopath/src/github.com/hyperledger/fabric/common/tools/cryptogen/crypto-config/peerOrganizations/peerOrg1/peers/peerOrg1Peer1")
-                                go startConsumer(serverAddr, channelIDs[c], ord, c, &(txRecv[ord][c]), &(blockRecv[ord][c]), &(consumerConns[ord][c]), seek, cafile, overridehostname, mspID, mspDir, tls)
+                                //time.Sleep(5 * time.Second)
+				go startConsumer(serverAddr, channelIDs[c], ord, c, &(txRecv[ord][c]), &(blockRecv[ord][c]), &(consumerConns[ord][c]), seek, cafile, overridehostname, mspID, mspDir, tls)
                         }
                 }
 
@@ -1360,6 +1362,7 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
                         // Normal mode: create a unique consumer client
                         // go thread for each channel
                         for c := 0 ; c < numChannels ; c++ {
+                                //time.Sleep(5 * time.Second)
                                 go startProducer(serverAddr, channelIDs[c], ord, c, countToSend[ord][c], &(txSent[ord][c]), &(txSentFailures[ord][c]), cafile, overridehostname, mspID, mspDir, tls)
                         }
                 }
