@@ -427,7 +427,28 @@ func startConsumer(serverAddr string, chanID string, ordererIndex int, channelIn
 func startConsumerMaster(serverAddr string, chanIdsP *[]string, ordererIndex int, txRecvCntrsP *[]int64, blockRecvCntrsP *[]int64, consumerConnP **grpc.ClientConn, seek int, cafile string, overridehostname string, mspID string, mspDir string, tls bool) {
         myName := clientName("MasterConsumer", ordererIndex, numChannels)
         // create one conn to the orderer and share it for communications to all channels
-        conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())
+        var opts []grpc.DialOption
+        if tls {
+                if cafile != "" {
+                        creds, err := credentials.NewClientTLSFromFile(
+                                cafile,
+                                overridehostname,
+                        )
+
+                        if err != nil {
+                                fmt.Println("Error in creating credential:", err)
+                                return
+                        }
+                        opts = append(opts, grpc.WithTransportCredentials(creds))
+                } else {
+                        fmt.Println("No CA Cert found")
+                        return
+                }
+        } else {
+                opts = append(opts, grpc.WithInsecure())
+        }
+
+        conn, err := grpc.Dial(serverAddr, opts...)
         if err != nil {
                 panic(fmt.Sprintf("Error on client %s connecting (grpc) to %s, err: %v", myName, serverAddr, err))
         }
@@ -464,15 +485,17 @@ func startConsumerMaster(serverAddr string, chanIdsP *[]string, ordererIndex int
         }
 }
 
-func startSpyDefer(listenAddr string, ordStartPort uint16, chanIdsP *[]string, ordererIndex int, txRecvCntrsP *[]int64, blockRecvCntrsP *[]int64, consumerConnP **grpc.ClientConn, seek int, cafile string, overridehostname string, mspID string, mspDir string, tls bool) {
+func startSpyDefer(serverAddr string, chanIdsP *[]string, ordererIndex int, txRecvCntrsP *[]int64, blockRecvCntrsP *[]int64, consumerConnP **grpc.ClientConn, seek int, cafile string, overridehostname string, mspID string, mspDir string, tls bool) {
 
         // Wait here until the user test application code successfully calls
         // startMasterSpy(), and provides a masterSpyOrdIndx
 
         masterSpyReadyWG.Wait()
-
+        cafile = fmt.Sprintf("../../../examples/fabric-docker-compose-svt/crypto-config/ordererOrganizations/example.com/orderers/orderer%d.example.com/tls/ca.crt", masterSpyOrdIndx)
+        overridehostname = fmt.Sprintf("orderer%d.example.com", masterSpyOrdIndx)
         logger(fmt.Sprintf("=== startSpyDefer proceeding to startConsumerMaster to spy on orderer%d", masterSpyOrdIndx))
-        serverAddr := fmt.Sprintf("%s:%d", listenAddr, ordStartPort + uint16(masterSpyOrdIndx))
+        listenAddr := fmt.Sprintf("127.0.0.1")
+        serverAddr = fmt.Sprintf("%s:%d", listenAddr, ordStartPort + (1000 * uint16(masterSpyOrdIndx)))
         startConsumerMaster(serverAddr, chanIdsP, ordererIndex, txRecvCntrsP, blockRecvCntrsP, consumerConnP, seek, cafile, overridehostname, mspID, mspDir, tls)
 }
 
@@ -1243,7 +1266,7 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
 
         ////////////////////////////////////////////////////////////////////////
 
-        launchNetwork(launchAppendFlags, chans)
+        //launchNetwork(launchAppendFlags, chans)
         time.Sleep(12 * time.Second)
 
         ordConf = config.Load()
@@ -1304,13 +1327,13 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
                         // orderers, masterSpyOrdIndx, selected by the user).
 
                         if masterSpy == spyOn {
-                                serverAddr = fmt.Sprintf("%s:%d", ordConf.General.ListenAddress, ordStartPort + uint16(masterSpyOrdIndx))
+                                //serverAddr = fmt.Sprintf("%s:%d", ordConf.General.ListenAddress, ordStartPort + uint16(masterSpyOrdIndx))
                                 go startConsumerMaster(serverAddr, &channelIDs, ord, &(txRecv[ord]), &(blockRecv[ord]), &(consumerConns[ord][0]), seek, cafile, overridehostname, mspID, mspDir, tls)
                         } else if masterSpy == spyDefer {
                                 // startSpyDefer will start the MasterConsumer, but first
                                 // waits until the user is ready and requests it by calling
                                 // startMasterSpy with the index of the orderer to monitor.
-                                go startSpyDefer(ordConf.General.ListenAddress, ordStartPort, &channelIDs, ord, &(txRecv[ord]), &(blockRecv[ord]), &(consumerConns[ord][0]), seek, cafile, overridehostname, mspID, mspDir, tls)
+                                go startSpyDefer(serverAddr, &channelIDs, ord, &(txRecv[ord]), &(blockRecv[ord]), &(consumerConns[ord][0]), seek, cafile, overridehostname, mspID, mspDir, tls)
                         }
                 } else
                 if optimizeClientsMode {
@@ -1374,6 +1397,7 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
                 logger(fmt.Sprintf("Finished creating all %d PRODUCERs at %v", numOrdsInNtwk * numChannels, time.Now()))
         }
         producersWG.Wait()
+        time.Sleep(60 * time.Second)
         logger(fmt.Sprintf("Send Duration (seconds): %4d", time.Now().Unix() - sendStart))
         recoverStart := time.Now().Unix()
 
@@ -1390,7 +1414,7 @@ func ote( testname string, txs int64, chans int, orderers int, ordType string, k
         computeTotals(&txSent, &totalNumTxSent, &txSentFailures, &totalNumTxSentFailures, &txRecv, &totalTxRecv, &totalTxRecvMismatch, &blockRecv, &totalBlockRecv, &totalBlockRecvMismatch)
 
         waitSecs := 0
-        for (!sendEqualRecv(numTxToSend, &totalTxRecv, totalTxRecvMismatch, totalBlockRecvMismatch)) && (moreDeliveries(&txSent, &totalNumTxSent, &txSentFailures, &totalNumTxSentFailures, &txRecv, &totalTxRecv, &totalTxRecvMismatch, &blockRecv, &totalBlockRecv, &totalBlockRecvMismatch) || waitSecs < batchTimeout+1) { time.Sleep(1 * time.Second); waitSecs++ }
+        for (!sendEqualRecv(numTxToSend, &totalTxRecv, totalTxRecvMismatch, totalBlockRecvMismatch)) && (moreDeliveries(&txSent, &totalNumTxSent, &txSentFailures, &totalNumTxSentFailures, &txRecv, &totalTxRecv, &totalTxRecvMismatch, &blockRecv, &totalBlockRecv, &totalBlockRecvMismatch) || waitSecs < batchTimeout+15) { time.Sleep(1 * time.Second); waitSecs++ }
 
         // Recovery Duration = time spent waiting for orderer service to finish delivering transactions,
         // after all producers finished sending them.
