@@ -1,4 +1,4 @@
-# Orderer Traffic Engine (OTE) - NOTE: Work In Progress to incorporate certs...
+# Orderer Traffic Engine (OTE)
 
 ## What does OTE do?
 
@@ -42,25 +42,25 @@ Check your Docker and Docker-Compose versions with the following commands:
 ### Prepare binaries and images:
 
 -  Prepare binaries and images manually
-- - Clone the fabric-test repository
-```
+   - Clone the fabric-test repository
+   ```bash
         cd $GOPATH/src/github.com/hyperledger
         http://gerrit.hyperledger.org/r/fabric-test
-```
-- - Clone the fabric repository, build the binaries and images
-```bash
+   ```
+   - Clone the fabric repository, build the binaries and images
+   ```bash
         cd $GOPATH/src/github.com/hyperledger
         http://gerrit.hyperledger.org/r/fabric
         cd $GOPATH/src/github.com/hyperledger/fabric
         make native docker
-```
-- - Clone the fabric-ca repository, build the images
-```bash
+   ```
+   - Clone the fabric-ca repository, build the images
+   ```bash
         cd $GOPATH/src/github.com/hyperledger/
         http://gerrit.hyperledger.org/r/fabric-ca
         cd $GOPATH/src/github.com/hyperledger/fabric-ca
         make docker
-```
+   ```
 
 ### Launch the Network using Network Launcher
 
@@ -76,11 +76,11 @@ Check your Docker and Docker-Compose versions with the following commands:
 ## Changing config.json
 
 - OTE uses config.json to parse for profile name, channel name, tls, seek, quiet values
-- - Profile: Name of the orderer profile in configtx.yaml
-- - Channel: Name of the channel
-- - TLS: true | false
-- - seek: -2 to start from oldest block to deliver or -1 to start from newest to deliver, N >= 0 to fetch block N only
-- - quiet: true (to keep quiet without printing blocks) | false (to printout delivered blocks)
+  - Profile: Name of the orderer profile in configtx.yaml
+  - Channel: Name of the channel
+  - TLS: true | false
+  - seek: -2 to start from oldest block to deliver or -1 to start from newest to deliver, N >= 0 to fetch block N only
+  - quiet: true (to keep quiet without printing blocks) | false (to printout delivered blocks)
 
 ## Launching OTE container
 
@@ -113,4 +113,4 @@ Check your Docker and Docker-Compose versions with the following commands:
 
 ## Collecting OTE logs
 
-- Logs for the testcases can be seen under $GOPATH/src/github.com/hyperledger/fabric/OTE/Logs/ directory
+- Logs for the testcases can be seen under `$GOPATH/src/github.com/hyperledger/fabric/OTE/Logs/` directory
